@@ -15,6 +15,8 @@ os.environ.update({
     "ADMIN_EMAILS": "admin@example.com",
     "JWT_SECRET": "test-secret-test-secret-test-secret",
     "RATE_LIMIT_PER_MINUTE": "1000",
+    # Tests must never reach a real model, even when the developer's .env holds real keys.
+    "GROQ_API_KEY": "", "NVIDIA_API_KEY": "", "GOOGLE_API_KEY": "", "OPENAI_API_KEY": "",
 })
 
 import pytest  # noqa: E402

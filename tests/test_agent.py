@@ -52,11 +52,22 @@ def test_ungrounded_answer_fails_verifier(client, llm):
     assert any("unsupported" in t for t in out["trace"])
 
 
-def test_direct_route_skips_retrieval(client, llm):
+def test_direct_route_is_a_fixed_reply_with_no_model_call(client, llm):
     user = register(client)
     out = _ask(client, user, "hello there")
     assert out["route"] == "direct"
-    assert llm.calls == ["route", "direct"]
+    assert out["answer"] == prompts.DIRECT_REPLY  # templated: a misrouted factual question can't get an outside fact
+    assert llm.calls == ["route"]
+
+
+def test_fullwidth_brackets_and_unicode_spaces_still_count_as_citations(client, llm):
+    llm.answer_override = "E\u2011417 means a thermal sensor fault at 10\u202fminutes\u3010S1\u3011."
+    user = register(client)
+    upload(client, user, "product_faq.txt")
+    out = _ask(client, user, "What does error code E-417 mean?")
+    assert out["answer_type"] == "grounded"
+    assert out["answer"] == "E-417 means a thermal sensor fault at 10 minutes[S1]."
+    assert [c["id"] for c in out["citations"]] == ["S1"]
 
 
 def test_tools_route_calls_mcp_tools(client, llm):

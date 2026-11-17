@@ -16,9 +16,14 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60
     admin_emails: str = ""  # comma-separated; these accounts get the admin role on register
 
-    llm_provider: str = "openai"  # openai | anthropic | ollama | fake
-    llm_model: str = "gpt-4o-mini"
+    llm_provider: str = "groq"  # groq | nvidia | gemini | openai | anthropic | ollama
+    llm_model: str = "openai/gpt-oss-120b"
     llm_temperature: float = 0.0
+    llm_reasoning_effort: str | None = None  # low | medium | high, for reasoning models (gpt-oss); fewer tokens when low
+    llm_max_retries: int = 6  # free tiers rate-limit per minute; the client backs off and retries on 429
+    groq_api_key: str | None = None
+    nvidia_api_key: str | None = None
+    google_api_key: str | None = None
 
     embedding_provider: str = "fastembed"  # fastembed | openai | hash
     embedding_model: str = "BAAI/bge-small-en-v1.5"

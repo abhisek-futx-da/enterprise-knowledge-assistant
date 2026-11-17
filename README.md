@@ -17,7 +17,7 @@ through an **MCP server**, which the agent uses through an MCP client for librar
 | Auth, roles, per-user data isolation | `app/security.py`, every query filtered by `owner_id` |
 | Web app: sign-in, dashboard, streaming chat with evidence, library, search lab | `web/` (React + TypeScript + Tailwind) |
 | Docker deployment | `Dockerfile`, `docker-compose.yml`, `.github/workflows/ci.yml` |
-| Tests and evaluation | `tests/` (42 tests), `eval/` |
+| Tests and evaluation | `tests/` (49 tests), `eval/` |
 
 ## Architecture
 
@@ -95,7 +95,7 @@ TypeScript and Tailwind; the charts are plain SVG, and there is no UI framework 
 ## Quick start (Docker)
 
 ```bash
-cp .env.example .env    # set JWT_SECRET and OPENAI_API_KEY (or another provider). Keys are read only from .env
+cp .env.example .env    # set JWT_SECRET and GROQ_API_KEY (free at console.groq.com). Keys are read only from .env
 docker compose up --build
 ```
 
@@ -133,7 +133,7 @@ cd web && npm install && npm run dev       # terminal 3 → http://localhost:517
 ## Tests and evaluation
 
 ```bash
-pytest -q                  # 42 tests, no API key or network needed
+pytest -q                  # 49 tests, no API key or network needed
 python -m eval.run_eval    # retrieval: vector vs BM25 vs hybrid, plus the relevance gate
 python -m eval.run_eval --with-llm   # adds end-to-end answer accuracy (calls the LLM)
 ```
@@ -159,6 +159,18 @@ Latest retrieval results (`eval/results.md`, 22 in-scope + 4 out-of-scope questi
 | bm25 | 0.86 | 0.95 | 0.90 |
 | hybrid | 0.95 | 1.00 | 0.98 |
 
+End-to-end answers with real models on Groq's free tier (`python -m eval.run_eval --with-llm`, per-model files in `eval/`):
+
+| Model | Correct fact | Cites right document | Off-topic refused | Median per question |
+|---|---|---|---|---|
+| `openai/gpt-oss-120b` | 22/22 | 22/22 | 4/4 | 16.4 s, ~2,400 tokens |
+| `qwen/qwen3.8-27b` | 22/22 | 22/22 | 4/4 | 15.4 s, ~1,900 tokens |
+
+The median time is mostly waiting on the free tier's limit of 8,000 tokens per minute while 26 questions run back
+to back. A single question in the app answers in a few seconds. The first run of this eval found two real bugs:
+gpt-oss cites as `【S1】` with Unicode no-break spaces (correct answers were rejected as uncited), and Qwen once
+routed general-knowledge questions to the greeting path. Both are fixed and covered by tests.
+
 On this small, mostly paraphrased question set, vector search alone is already perfect. Hybrid's value
 shows on exact identifiers (error codes, version numbers, names) that embeddings blur. 26 questions is
 a smoke test, not a benchmark. Re-run the eval on your own documents before you rely on these numbers.
@@ -171,7 +183,9 @@ All settings are environment variables (`app/config.py`). The main ones:
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./data/app.db` | `postgresql+psycopg://…` enables pgvector + an HNSW index |
 | `REDIS_URL` | unset → in-process cache | Answer cache, embedding cache, rate limits |
-| `LLM_PROVIDER` / `LLM_MODEL` | `openai` / `gpt-4o-mini` | Any chat model your key can access; also `anthropic`, `ollama` |
+| `LLM_PROVIDER` / `LLM_MODEL` | `groq` / `openai/gpt-oss-120b` | Open-weight model on Groq's free tier. Also `nvidia`, `gemini`, `openai`, `anthropic`, `ollama` |
+| `LLM_REASONING_EFFORT` | unset | `low` / `medium` / `high` for reasoning models such as gpt-oss |
+| `LLM_MAX_RETRIES` | `6` | Free tiers limit tokens per minute; the client backs off and retries on HTTP 429 |
 | `EMBEDDING_PROVIDER` | `fastembed` (`BAAI/bge-small-en-v1.5`, 384-d, local) | Also `openai`; `hash` is for tests only |
 | `MIN_RELEVANCE` | `0.55` | Relevance gate, set from the eval (in-scope min 0.62, out-of-scope max 0.54) |
 | `GROUNDEDNESS_CHECK` | `true` | LLM fact-check of every answer |

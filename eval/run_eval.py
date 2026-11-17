@@ -10,9 +10,11 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import statistics
 import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
 
@@ -20,7 +22,9 @@ ROOT = Path(__file__).resolve().parent
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{tempfile.mkdtemp(prefix='eka-eval-')}/eval.db")
 os.environ.setdefault("REDIS_URL", "")
 
-from app.agent.graph import run_agent  # noqa: E402
+from langchain_core.callbacks import get_usage_metadata_callback  # noqa: E402
+
+from app.agent.graph import normalize_text, run_agent  # noqa: E402
 from app.agent.llm import get_llm  # noqa: E402
 from app.agent.prompts import REFUSAL  # noqa: E402
 from app.config import get_settings  # noqa: E402
@@ -93,22 +97,29 @@ async def answer_eval(user: User, cases: list[dict]) -> dict:
     token, llm = create_access_token(user), get_llm()
     rows = []
     for case in cases:
-        out = await run_agent(question=case["question"], history=[], user_id=user.id, token=token,
-                              llm=llm, tool_loader=no_tools)
+        start = time.perf_counter()
+        with get_usage_metadata_callback() as usage:
+            out = await run_agent(question=case["question"], history=[], user_id=user.id, token=token,
+                                  llm=llm, tool_loader=no_tools)
+        cost = {"seconds": time.perf_counter() - start,
+                "tokens": sum(u.get("total_tokens", 0) for u in usage.usage_metadata.values())}
         if case["expected_file"]:
-            correct = any(s in out["answer"] for s in case["expected_answer_contains"])
+            correct = any(s in normalize_text(out["answer"]) for s in case["expected_answer_contains"])
             cited_right = any(c["filename"] == case["expected_file"] for c in out["citations"])
             rows.append({"q": case["question"], "kind": "in_scope", "correct": correct, "cited_right": cited_right,
-                         "type": out["answer_type"]})
+                         "type": out["answer_type"], "answer": out["answer"], **cost})
         else:
             rows.append({"q": case["question"], "kind": "out_of_scope", "correct": out["answer"] == REFUSAL,
-                         "cited_right": None, "type": out["answer_type"]})
+                         "cited_right": None, "type": out["answer_type"], "answer": out["answer"], **cost})
+        sys.stderr.write(f"[{len(rows)}/{len(cases)}] {'ok ' if rows[-1]['correct'] else 'MISS'} {case['question']}\n")
     ins = [r for r in rows if r["kind"] == "in_scope"]
     outs = [r for r in rows if r["kind"] == "out_of_scope"]
     return {
         "answer_accuracy": statistics.mean(r["correct"] for r in ins),
         "citation_accuracy": statistics.mean(r["cited_right"] for r in ins),
         "correct_refusals": statistics.mean(r["correct"] for r in outs),
+        "median_seconds": statistics.median(r["seconds"] for r in rows),
+        "median_tokens": statistics.median(r["tokens"] for r in rows),
         "rows": rows,
     }
 
@@ -138,10 +149,16 @@ def to_markdown(retrieval: dict, answers: dict | None) -> str:
             "", f"## End-to-end answers (`{s.llm_provider}` `{s.llm_model}`)", "",
             f"- Answer contains expected fact: {answers['answer_accuracy']:.2f}",
             f"- Cites the expected document: {answers['citation_accuracy']:.2f}",
-            f"- Out-of-scope questions correctly refused: {answers['correct_refusals']:.2f}", "",
-            "| Question | Kind | Correct | Answer type |", "|---|---|---|---|",
+            f"- Out-of-scope questions correctly refused: {answers['correct_refusals']:.2f}",
+            f"- Median per question: {answers['median_seconds']:.1f} s, {answers['median_tokens']:.0f} tokens"
+            f" (reasoning effort: {s.llm_reasoning_effort or 'provider default'})", "",
+            "| Question | Kind | Correct | Answer type | Seconds | Tokens | Answer |", "|---|---|---|---|---|---|---|",
         ]
-        lines += [f"| {r['q']} | {r['kind']} | {'yes' if r['correct'] else 'no'} | {r['type']} |" for r in answers["rows"]]
+        lines += [
+            f"| {r['q']} | {r['kind']} | {'yes' if r['correct'] else 'no'} | {r['type']} | {r['seconds']:.1f} | {r['tokens']} | "
+            f"{r['answer'][:160].replace('|', '/').replace(chr(10), ' ')} |"
+            for r in answers["rows"]
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -154,7 +171,9 @@ def main() -> None:
     retrieval = retrieval_eval(user, cases)
     answers = asyncio.run(answer_eval(user, cases)) if args.with_llm else None
     md = to_markdown(retrieval, answers)
-    (ROOT / "results.md").write_text(md)
+    s = get_settings()
+    name = f"results-{s.llm_provider}-{re.sub(r'[^a-z0-9.]+', '-', s.llm_model.lower())}.md" if answers else "results.md"
+    (ROOT / name).write_text(md)
     sys.stdout.write(md)
 
 

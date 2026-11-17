@@ -7,6 +7,7 @@ import asyncio
 import json
 import operator
 import re
+import unicodedata
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Annotated, Any, Literal, TypedDict
 
@@ -26,6 +27,12 @@ from app.retrieval.search import search
 MAX_TOOL_ROUNDS = 3
 HISTORY_TURNS = 6
 _CITATION = re.compile(r"\[(S\d+)\]")
+# Some models (gpt-oss) cite as 【S1】 and use no-break spaces and hyphens; NFKC alone doesn't map 【】 or ‑.
+_CANONICAL = str.maketrans({"\u3010": "[", "\u3011": "]", "\u2010": "-", "\u2011": "-"})
+
+
+def normalize_text(text: str) -> str:
+    return unicodedata.normalize("NFKC", text).translate(_CANONICAL)
 
 ToolLoader = Callable[[str], Awaitable[list[BaseTool]]]
 
@@ -164,7 +171,7 @@ async def generate_node(state: AgentState, config: RunnableConfig) -> dict:
         user += f"\n\nYour previous answer was rejected: {feedback}. Answer again using only supported claims."
     reply = await _llm(config).ainvoke([SystemMessage(prompts.ANSWER_PROMPT), HumanMessage(user)])
     return {
-        "answer": str(reply.content).strip(), "generations": state.get("generations", 0) + 1,
+        "answer": normalize_text(str(reply.content)).strip(), "generations": state.get("generations", 0) + 1,
         "trace": [f"generate (attempt {state.get('generations', 0) + 1})"],
     }
 
@@ -223,10 +230,10 @@ async def unverified_node(state: AgentState) -> dict:
             "trace": ["unverified -> withheld answer that failed verification"]}
 
 
-async def direct_node(state: AgentState, config: RunnableConfig) -> dict:
-    reply = await _llm(config).ainvoke([SystemMessage(prompts.DIRECT_PROMPT), HumanMessage(state["question"])])
-    return {"answer": str(reply.content).strip(), "answer_type": "direct", "citations": [], "grounded": None,
-            "trace": ["direct reply"]}
+async def direct_node(state: AgentState) -> dict:
+    """Fixed text, no model call: a factual question misrouted here can never get an outside-knowledge answer."""
+    return {"answer": prompts.DIRECT_REPLY, "answer_type": "direct", "citations": [], "grounded": None,
+            "trace": ["direct reply (fixed text)"]}
 
 
 async def tool_agent_node(state: AgentState, config: RunnableConfig) -> dict:
