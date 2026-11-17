@@ -1,12 +1,8 @@
+# Secrets and LLM settings come only from .env (env_file), never from the shell that runs compose,
+# so a key exported in your terminal for another project can't leak into this stack.
 x-app-env: &app-env
   DATABASE_URL: postgresql+psycopg://kb:kb@postgres:5432/kb
   REDIS_URL: redis://redis:6379/0
-  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
-  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
-  LLM_PROVIDER: ${LLM_PROVIDER:-openai}
-  LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
-  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   MCP_SERVER_URL: http://mcp:8001/mcp
   AUTH_ISSUER_URL: http://api:8000
 
@@ -33,6 +29,7 @@ services:
 
   api:
     build: { context: ., target: base }
+    env_file: [{ path: .env, required: true }]
     environment: *app-env
     ports: ["8000:8000"]
     depends_on:
@@ -46,6 +43,7 @@ services:
   mcp:
     build: { context: ., target: base }
     command: ["python", "-m", "app.mcp_server"]
+    env_file: [{ path: .env, required: true }]
     environment:
       <<: *app-env
       MCP_PUBLIC_URL: http://mcp:8001/mcp
@@ -54,11 +52,9 @@ services:
     depends_on:
       api: { condition: service_healthy }
 
-  ui:
-    build: { context: ., target: ui }
-    environment:
-      API_URL: http://api:8000
-    ports: ["8501:8501"]
+  web:
+    build: { context: ., target: web }
+    ports: ["3000:8080"]
     depends_on:
       api: { condition: service_healthy }
 

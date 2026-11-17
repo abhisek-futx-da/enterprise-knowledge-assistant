@@ -24,9 +24,8 @@ from langchain_core.messages import AIMessage, SystemMessage, ToolMessage  # noq
 from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
 
 from app.agent import prompts  # noqa: E402
-from app.agent.llm import get_llm  # noqa: E402
 from app.main import app  # noqa: E402
-from app.routers.chat import get_tool_loader  # noqa: E402
+from app.routers.chat import chat_llm, get_tool_loader  # noqa: E402
 
 CORPUS = Path(__file__).resolve().parent.parent / "eval" / "corpus"
 _SOURCE = re.compile(r'<source id="(S\d+)"[^>]*>\n(.*?)\n</source>', re.DOTALL)
@@ -100,7 +99,7 @@ def client(llm):
     async def no_tools(token: str):
         raise ConnectionError("MCP not running in this test")
 
-    app.dependency_overrides[get_llm] = lambda: llm
+    app.dependency_overrides[chat_llm] = lambda: llm
     app.dependency_overrides[get_tool_loader] = lambda: no_tools
     with TestClient(app) as c:
         yield c

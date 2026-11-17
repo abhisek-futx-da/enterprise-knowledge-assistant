@@ -83,8 +83,26 @@ class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     role: str
     content: str
+    answer_type: str | None
     citations: list | None
     created_at: datetime
+
+
+class ConversationOut(BaseModel):
+    id: str
+    title: str
+    questions: int
+    created_at: datetime
+
+
+class WorkspaceStats(BaseModel):
+    documents: int
+    documents_by_status: dict[str, int]
+    pages: int
+    chunks: int
+    conversations: int
+    questions: int
+    answers_by_type: dict[str, int]
 
 
 class AdminStats(BaseModel):

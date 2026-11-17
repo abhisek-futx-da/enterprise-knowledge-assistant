@@ -73,6 +73,18 @@ The `trace` above shows the shape of the response; its scores are illustrative.
 `GET /conversations/{id}/messages` returns the stored history. Another user's conversation returns `404`.
 `/chat` returns `429` when the per-user rate limit is exceeded.
 
+### Streaming
+
+`POST /chat/stream` takes the same body and returns `text/event-stream`. Events arrive in order:
+`{"type":"start","conversation_id"}`, then one `{"type":"step","node","trace"}` per agent node as it
+finishes, then `{"type":"final", …}` (same shape as the `/chat` response). If the model call fails after
+streaming has started, the last event is `{"type":"error","detail"}`. Validation, auth, rate-limit and
+"LLM not configured" (`503`) errors are returned as normal HTTP errors before the stream starts.
+
+`GET /conversations` lists the caller's 30 most recent conversations (title = first question).
+`GET /stats` returns the caller's own counts: documents by status, pages, passages, questions and
+answers by type. The web dashboard is built on it.
+
 ## Admin (role `admin`)
 
 | Method | Path | Returns |

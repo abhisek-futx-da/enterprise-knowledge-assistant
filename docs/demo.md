@@ -16,16 +16,17 @@ LLM → verify → citations. Point out the MCP server as a separate service tha
 
 ## 2. Auth and isolation (1 min)
 
-UI at http://localhost:8501: register **alice** and **bob** in two browser windows (one private).
+Web app at http://localhost:3000: register **alice** and **bob** in two browser windows (one private).
+Or click **Explore the demo workspace** for the pre-loaded account.
 
 ## 3. Ingestion (1 min)
 
-As alice, upload the four files in `eval/corpus/`. Each document shows ⏳, then ✅ with its page and
-chunk counts.
+As alice, drop the four files from `eval/corpus/` on the Library page. Each shows **Indexing**, then
+**Ready** with page and passage counts.
 
 ## 4. Hybrid search (2 min)
 
-Open the **Search playground** tab and run each query:
+Open **Search lab** and run each query (hover a result to see its rank in the other lists):
 
 - `E-417`: BM25 ranks the exact error-code passage first. Vector search gets the right file, but
   for a reason that is less certain.
@@ -35,7 +36,8 @@ Open the **Search playground** tab and run each query:
 
 ## 5. Agent with citations (2 min)
 
-In the **Chat** tab, open **Agent trace** for each answer:
+On **Ask**, watch the steps stream in, click a citation chip to open the passage, and use
+**How this was answered** for the full trace:
 
 1. "What does error code E-417 mean?" → grounded, cites `product_faq.txt` page 1.
 2. Follow-up: "And what should I do if it comes back?" → the router turns it into a standalone

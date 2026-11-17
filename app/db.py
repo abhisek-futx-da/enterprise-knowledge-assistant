@@ -63,6 +63,8 @@ def init_db() -> None:
         conn.execute(text("SELECT pg_advisory_xact_lock(7340291)"))
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         Base.metadata.create_all(conn)
+        # create_all never alters existing tables; columns added after first deploy go here until Alembic is adopted.
+        conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS answer_type VARCHAR(20)"))
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_chunks_embedding_hnsw ON chunks USING hnsw (embedding vector_cosine_ops)"
         ))

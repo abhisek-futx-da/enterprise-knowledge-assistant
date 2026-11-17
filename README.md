@@ -15,14 +15,15 @@ through an **MCP server**, which the agent uses through an MCP client for librar
 | FastAPI REST API | `app/main.py`, `app/routers/` |
 | PostgreSQL / SQLite + Redis | `app/db.py`, `app/models.py`, `app/cache.py` |
 | Auth, roles, per-user data isolation | `app/security.py`, every query filtered by `owner_id` |
+| Web app: sign-in, dashboard, streaming chat with evidence, library, search lab | `web/` (React + TypeScript + Tailwind) |
 | Docker deployment | `Dockerfile`, `docker-compose.yml`, `.github/workflows/ci.yml` |
-| Tests and evaluation | `tests/` (37 tests), `eval/` |
+| Tests and evaluation | `tests/` (42 tests), `eval/` |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    U[User / Streamlit UI] -->|JWT| API[FastAPI<br/>auth · documents · search · chat]
+    U[Web app<br/>React · nginx] -->|JWT · SSE| API[FastAPI<br/>auth · documents · search · chat]
     API -->|background task| ING[Ingestion<br/>extract → chunk → embed]
     ING --> PG[(PostgreSQL + pgvector<br/>users · documents · chunks · chats)]
     API --> AG[LangGraph agent]
@@ -58,7 +59,7 @@ flowchart TD
 
 ### Request flow for a question
 
-1. `POST /chat` checks the JWT, applies the per-user rate limit (Redis), and checks the answer cache.
+1. `POST /chat/stream` (or `/chat`) checks the JWT, applies the per-user rate limit (Redis), and checks the answer cache.
 2. **route**: the LLM classifies the question and rewrites follow-ups into standalone questions using
    the conversation history.
 3. **retrieve**: hybrid search over **only this user's chunks**: pgvector cosine search plus BM25,
@@ -69,18 +70,38 @@ flowchart TD
 5. **generate**: the LLM answers only from the numbered sources and cites them as `[S1]`.
 6. **verify**: code rejects invented or missing citation ids. Then an LLM fact-check rejects claims not
    supported by the sources. A failed answer is regenerated once with that feedback, then withheld.
-7. The answer, its citations (file, page, snippet) and the agent trace are returned and stored.
+7. Each node's progress streams to the UI as Server-Sent Events while it runs. The answer, its citations
+   (file, page, passage) and the agent trace are returned and stored.
+
+## The web app
+
+A focused workspace for asking documents questions and checking the answers. It is built with React,
+TypeScript and Tailwind; the charts are plain SVG, and there is no UI framework dependency.
+
+- **Sign in**: the left panel shows a verified answer being built step by step, so the product explains
+  itself before login. One click opens the demo workspace.
+- **Home**: an oversized ask field with suggested questions, a drop-to-upload tile, library metrics, an
+  answer-quality dial (verified, declined, withheld) and recent conversations.
+- **Ask**: answers stream in as the agent works ("Searching your documents… Verifying every claim…").
+  Numbered citation chips open the exact passage in the **evidence panel**, with your question's words
+  highlighted. Declined and withheld answers say why. Conversation history is on the left.
+- **Library**: drag-and-drop upload, live indexing status, per-document "Ask about it", and delete with
+  a confirmation step.
+- **Search lab**: semantic, BM25 and hybrid results side by side. Hovering a passage shows where it
+  ranks in each list, which makes the fusion visible.
+- Light and dark themes (the system setting by default), keyboard first (`⌘K` to ask, `Enter` to send),
+  responsive down to phones with a bottom tab bar, reduced-motion aware, and a strict CSP from nginx.
 
 ## Quick start (Docker)
 
 ```bash
-cp .env.example .env    # set JWT_SECRET and OPENAI_API_KEY (or another provider)
+cp .env.example .env    # set JWT_SECRET and OPENAI_API_KEY (or another provider). Keys are read only from .env
 docker compose up --build
 ```
 
 | Service | URL |
 |---|---|
-| UI (Streamlit) | http://localhost:8501 |
+| **Web app** | **http://localhost:3000** |
 | REST API + Swagger docs | http://localhost:8000/docs |
 | MCP server (Streamable HTTP) | http://localhost:8001/mcp |
 
@@ -106,13 +127,13 @@ pip install -r requirements-dev.txt
 cp .env.example .env                        # SQLite + in-process cache by default
 uvicorn app.main:app --reload --port 8000   # terminal 1
 python -m app.mcp_server                    # terminal 2
-API_URL=http://localhost:8000 streamlit run ui/streamlit_app.py   # terminal 3
+cd web && npm install && npm run dev       # terminal 3 → http://localhost:5173 (proxies /api to :8000)
 ```
 
 ## Tests and evaluation
 
 ```bash
-pytest -q                  # 37 tests, no API key or network needed
+pytest -q                  # 42 tests, no API key or network needed
 python -m eval.run_eval    # retrieval: vector vs BM25 vs hybrid, plus the relevance gate
 python -m eval.run_eval --with-llm   # adds end-to-end answer accuracy (calls the LLM)
 ```
@@ -177,7 +198,7 @@ app/
   agent/             graph.py (LangGraph) · prompts.py · llm.py · mcp_client.py
   mcp_server.py      MCP server (FastMCP, Streamable HTTP, JWT-verified)
   routers/           auth · documents/search · chat · admin
-ui/streamlit_app.py  demo UI
+web/                 React + TypeScript + Tailwind app, served by nginx (web/nginx.conf)
 eval/                corpus, labelled questions, run_eval.py, results.md
 tests/               pytest suite
 scripts/             smoke_test.py

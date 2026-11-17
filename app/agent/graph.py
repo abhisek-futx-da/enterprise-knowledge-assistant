@@ -7,7 +7,7 @@ import asyncio
 import json
 import operator
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.language_models import BaseChatModel
@@ -200,7 +200,7 @@ async def verify_node(state: AgentState, config: RunnableConfig) -> dict:
             return {"grounded": False, "feedback": problem, "trace": [f"verify -> failed: {problem[:80]}"]}
     citations = [
         {"id": s["id"], "document_id": s["document_id"], "filename": s["filename"],
-         "page": s["page"], "chunk_index": s["chunk_index"], "snippet": s["text"][:300]}
+         "page": s["page"], "chunk_index": s["chunk_index"], "snippet": s["text"]}
         for s in valid
     ]
     return {"grounded": True, "answer_type": "grounded", "citations": citations,
@@ -297,12 +297,33 @@ def build_graph():
 GRAPH = build_graph()
 
 
-async def run_agent(
+_ACCUMULATED = ("trace", "tool_calls")  # fields with operator.add reducers in AgentState
+
+
+async def stream_agent(
     *, question: str, history: list[dict], user_id: str, token: str,
     llm: BaseChatModel, tool_loader: ToolLoader,
-) -> dict[str, Any]:
+) -> AsyncIterator[dict[str, Any]]:
+    """Yields {"type": "step", ...} as each graph node finishes, then {"type": "final", ...}."""
     config: RunnableConfig = {"configurable": {"llm": llm, "tool_loader": tool_loader, "token": token}}
-    state = await GRAPH.ainvoke({"question": question, "history": history, "user_id": user_id}, config)
+    state: dict[str, Any] = {"question": question, "history": history, "user_id": user_id}
+    async for update in GRAPH.astream(state, config, stream_mode="updates"):
+        for node, delta in update.items():
+            for key, value in (delta or {}).items():
+                state[key] = state.get(key, []) + value if key in _ACCUMULATED else value
+            yield {"type": "step", "node": node, "trace": (delta or {}).get("trace", [])}
+    yield {"type": "final", **_result(state)}
+
+
+async def run_agent(**kwargs: Any) -> dict[str, Any]:
+    final: dict[str, Any] = {}
+    async for event in stream_agent(**kwargs):
+        final = event
+    final.pop("type")
+    return final
+
+
+def _result(state: dict[str, Any]) -> dict[str, Any]:
     return {
         "answer": state.get("answer", prompts.REFUSAL),
         "answer_type": state.get("answer_type", "refused"),

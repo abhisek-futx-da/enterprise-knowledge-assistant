@@ -118,3 +118,78 @@ def test_rate_limit(client, monkeypatch):
     user = register(client)
     codes = [client.post("/chat", headers=user["headers"], json={"question": "hello"}).status_code for _ in range(3)]
     assert codes == [200, 200, 429]
+
+
+def _sse_events(response) -> list[dict]:
+    import json
+    return [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+
+
+def test_stream_emits_steps_then_same_final_as_chat(client, llm):
+    user = register(client)
+    upload(client, user, "product_faq.txt")
+    r = client.post("/chat/stream", headers=user["headers"], json={"question": "What does error code E-417 mean?"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/event-stream")
+    events = _sse_events(r)
+    assert events[0]["type"] == "start"
+    assert [e["node"] for e in events if e["type"] == "step"] == ["route", "retrieve", "grade", "generate", "verify"]
+    final = events[-1]
+    assert final["type"] == "final" and final["answer_type"] == "grounded"
+    assert final["conversation_id"] == events[0]["conversation_id"]
+    assert final["trace"] == [t for e in events if e["type"] == "step" for t in e["trace"]]
+
+
+def test_stream_rejects_before_streaming(client):
+    user = register(client)
+    r = client.post("/chat/stream", headers=user["headers"], json={"question": "hi", "conversation_id": "nope"})
+    assert r.status_code == 404
+
+
+def test_conversation_list_and_workspace_stats(client):
+    user = register(client)
+    upload(client, user, "product_faq.txt")
+    first = _ask(client, user, "What does error code E-417 mean?")
+    _ask(client, user, "What does error code E-102 mean?", first["conversation_id"])
+    _ask(client, user, "hello")
+    convos = client.get("/conversations", headers=user["headers"]).json()
+    assert [c["questions"] for c in convos] == [1, 2]
+    assert convos[1]["title"] == "What does error code E-417 mean?"
+    stats = client.get("/stats", headers=user["headers"]).json()
+    assert stats["documents"] == 1 and stats["documents_by_status"] == {"ready": 1}
+    assert stats["questions"] == 3 and stats["conversations"] == 2
+    assert stats["answers_by_type"]["grounded"] == 2 and stats["answers_by_type"]["direct"] == 1
+    other = register(client)
+    assert client.get("/conversations", headers=other["headers"]).json() == []
+    assert client.get("/stats", headers=other["headers"]).json()["questions"] == 0
+
+
+def test_llm_failure_is_reported_not_hung(client, llm, monkeypatch):
+    async def boom(*args, **kwargs):
+        raise RuntimeError("provider says: secret-ish upstream message")
+
+    monkeypatch.setattr(type(llm), "ainvoke", boom)
+    user = register(client)
+    r = client.post("/chat", headers=user["headers"], json={"question": "hello"})
+    assert r.status_code == 502 and "RuntimeError" in r.json()["detail"]
+    assert "secret-ish" not in r.json()["detail"]
+    events = _sse_events(client.post("/chat/stream", headers=user["headers"], json={"question": "hello"}))
+    assert events[0]["type"] == "start" and events[-1]["type"] == "error"
+    assert "RuntimeError" in events[-1]["detail"] and "secret-ish" not in events[-1]["detail"]
+
+
+def test_unconfigured_llm_returns_actionable_503(client, monkeypatch):
+    from app.agent.llm import get_llm
+    from app.config import get_settings
+    from app.routers.chat import chat_llm
+
+    app.dependency_overrides.pop(chat_llm)
+    monkeypatch.setattr(get_settings(), "llm_provider", "not-a-provider")
+    get_llm.cache_clear()
+    try:
+        user = register(client)
+        for path in ("/chat", "/chat/stream"):
+            r = client.post(path, headers=user["headers"], json={"question": "hello"})
+            assert r.status_code == 503 and "LLM_PROVIDER" in r.json()["detail"]
+    finally:
+        get_llm.cache_clear()

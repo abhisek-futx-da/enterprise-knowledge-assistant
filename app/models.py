@@ -94,5 +94,6 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String(20))  # user | assistant
     content: Mapped[str] = mapped_column(Text)
+    answer_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # assistant messages only
     citations: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

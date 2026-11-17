@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.cache import bump_corpus_version
@@ -7,9 +7,9 @@ from app.config import get_settings
 from app.db import get_db
 from app.ingestion.extract import SUPPORTED_EXTENSIONS
 from app.ingestion.pipeline import ingest_document
-from app.models import Document, User
+from app.models import Conversation, Document, Message, User
 from app.retrieval.search import search
-from app.schemas import DocumentOut, SearchHitOut, SearchRequest
+from app.schemas import DocumentOut, SearchHitOut, SearchRequest, WorkspaceStats
 from app.security import get_current_user
 
 router = APIRouter(tags=["documents"])
@@ -68,3 +68,27 @@ def search_documents(
 ) -> list[dict]:
     """Raw retrieval, no LLM. Compare `mode` = vector | bm25 | hybrid on the same query."""
     return [h.to_dict() for h in search(db, user.id, body.query, body.top_k, body.mode)]
+
+
+@router.get("/stats", response_model=WorkspaceStats, tags=["workspace"])
+def workspace_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> WorkspaceStats:
+    """The caller's own numbers for the home dashboard: library size and how questions were answered."""
+    docs = db.execute(
+        select(Document.status, func.count(), func.coalesce(func.sum(Document.num_pages), 0),
+               func.coalesce(func.sum(Document.num_chunks), 0))
+        .where(Document.owner_id == user.id).group_by(Document.status)
+    ).all()
+    owned = select(Conversation.id).where(Conversation.owner_id == user.id)
+    messages = db.execute(
+        select(Message.role, Message.answer_type, func.count())
+        .where(Message.conversation_id.in_(owned)).group_by(Message.role, Message.answer_type)
+    ).all()
+    return WorkspaceStats(
+        documents=sum(n for _, n, _, _ in docs),
+        documents_by_status={s: n for s, n, _, _ in docs},
+        pages=sum(int(p) for _, _, p, _ in docs),
+        chunks=sum(int(c) for _, _, _, c in docs),
+        conversations=db.scalar(select(func.count()).select_from(owned.subquery())) or 0,
+        questions=sum(n for role, _, n in messages if role == "user"),
+        answers_by_type={t: n for role, t, n in messages if role == "assistant" and t},
+    )

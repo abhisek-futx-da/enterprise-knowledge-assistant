@@ -2,11 +2,12 @@
 
     python scripts/seed_demo.py
 """
+import os
 from pathlib import Path
 
 import httpx
 
-API = "http://localhost:8000"
+API = os.getenv("API_URL", "http://localhost:8000")
 EMAIL, PASSWORD = "demo@example.com", "demo-password-1"
 CORPUS = Path(__file__).resolve().parent.parent / "eval" / "corpus"
 
@@ -24,7 +25,7 @@ def main() -> None:
             continue
         c.post("/documents", headers=headers, files={"file": (path.name, path.read_bytes(), "text/plain")}).raise_for_status()
         print(f"upload {path.name}")
-    print(f"\nLog in at http://localhost:8501 with {EMAIL} / {PASSWORD}")
+    print(f"\nLog in at http://localhost:3000 with {EMAIL} / {PASSWORD}")
 
 
 if __name__ == "__main__":
