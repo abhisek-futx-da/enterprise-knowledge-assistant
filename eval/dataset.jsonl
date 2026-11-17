@@ -1,0 +1,26 @@
+{"question": "How many days of paid annual leave do full-time employees get?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["24"]}
+{"question": "How much unused leave can I carry over to next year?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["5"]}
+{"question": "How long is the probation period for new joiners?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["90"]}
+{"question": "What is the notice period for a manager after confirmation?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["90"]}
+{"question": "How many weeks of parental leave does a primary caregiver receive?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["26"]}
+{"question": "What is the daily limit for business meal reimbursement?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["60"]}
+{"question": "How much money do I get each year for training and courses?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["1,500"]}
+{"question": "How many days a week can I work from home?", "expected_file": "employee_handbook.md", "expected_answer_contains": ["three", "3"]}
+{"question": "What is the minimum password length?", "expected_file": "it_security_policy.md", "expected_answer_contains": ["14"]}
+{"question": "Within how many hours must a security incident be reported?", "expected_file": "it_security_policy.md", "expected_answer_contains": ["2"]}
+{"question": "What are the data classification levels?", "expected_file": "it_security_policy.md", "expected_answer_contains": ["Restricted"]}
+{"question": "When must a lost laptop be reported?", "expected_file": "it_security_policy.md", "expected_answer_contains": ["1 hour"]}
+{"question": "How often are production access rights reviewed?", "expected_file": "it_security_policy.md", "expected_answer_contains": ["quarter"]}
+{"question": "What does error code E-417 mean?", "expected_file": "product_faq.txt", "expected_answer_contains": ["thermal"]}
+{"question": "What happens with E-102?", "expected_file": "product_faq.txt", "expected_answer_contains": ["grid"]}
+{"question": "How much energy can the HX-200 store?", "expected_file": "product_faq.txt", "expected_answer_contains": ["12.5"]}
+{"question": "How long is the battery covered under warranty?", "expected_file": "product_faq.txt", "expected_answer_contains": ["10"]}
+{"question": "Which firmware version is the latest?", "expected_file": "product_faq.txt", "expected_answer_contains": ["4.2.1"]}
+{"question": "What is the hotel limit per night in London?", "expected_file": "travel_policy.md", "expected_answer_contains": ["320"]}
+{"question": "What cabin class may I fly on a 4 hour flight?", "expected_file": "travel_policy.md", "expected_answer_contains": ["Economy", "economy"]}
+{"question": "How far in advance must I book business trips?", "expected_file": "travel_policy.md", "expected_answer_contains": ["14"]}
+{"question": "What is the daily per diem when travelling?", "expected_file": "travel_policy.md", "expected_answer_contains": ["75"]}
+{"question": "What is the capital of Australia?", "expected_file": null, "expected_answer_contains": []}
+{"question": "Who won the football world cup in 2022?", "expected_file": null, "expected_answer_contains": []}
+{"question": "What is the company's stock price today?", "expected_file": null, "expected_answer_contains": []}
+{"question": "What is the dental insurance coverage limit?", "expected_file": null, "expected_answer_contains": []}

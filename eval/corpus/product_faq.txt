@@ -1,0 +1,24 @@
+Helios HX-200 Home Battery - Support FAQ
+
+What is the capacity of the HX-200?
+The HX-200 stores 12.5 kWh of usable energy and delivers up to 5 kW continuous power (7.6 kW peak).
+
+What warranty does the HX-200 have?
+The HX-200 has a 10-year warranty or 6,000 full cycles, whichever comes first. The warranty
+guarantees at least 70% of original capacity at the end of the warranty period.
+
+What does error code E-417 mean?
+E-417 means a thermal sensor fault. Switch the unit off at the isolator, wait 10 minutes, and turn
+it back on. If E-417 returns within 24 hours, book a technician visit.
+
+What does error code E-102 mean?
+E-102 means the grid connection was lost. The battery switches to backup mode automatically and
+returns to normal operation when the grid is restored.
+
+Which firmware version is current?
+The current firmware is version 4.2.1, released in September 2026. It improves charge scheduling
+during off-peak tariffs. Updates install automatically overnight.
+
+Can the HX-200 be installed outdoors?
+Yes. The HX-200 is rated IP65 and operates between -10 C and 50 C. It must not be installed in
+direct sunlight on south-facing walls.
