@@ -6,6 +6,7 @@
 cp .env.example .env   # set JWT_SECRET and OPENAI_API_KEY
 docker compose up --build
 python scripts/smoke_test.py    # shows every subsystem passing before the live demo
+python scripts/seed_demo.py     # demo@example.com / demo-password-1 with the sample documents
 ```
 
 ## 1. Architecture (2 min)

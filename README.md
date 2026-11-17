@@ -84,6 +84,13 @@ docker compose up --build
 | REST API + Swagger docs | http://localhost:8000/docs |
 | MCP server (Streamable HTTP) | http://localhost:8001/mcp |
 
+Load a demo account (`demo@example.com` / `demo-password-1`) with the sample documents. It is safe to
+re-run, including after `docker compose down -v` wipes the database:
+
+```bash
+python scripts/seed_demo.py
+```
+
 Check the running stack end to end (auth, ingestion, all three search modes, isolation and MCP):
 
 ```bash
