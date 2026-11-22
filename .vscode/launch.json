@@ -1,0 +1,61 @@
+{
+  // Run and Debug panel → "Run app (API + MCP + Web)", then open http://localhost:5173
+  // No Docker needed: SQLite instead of Postgres, in-process cache instead of Redis. Keys come from .env.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (FastAPI :8000)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "MCP server (:8001)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.mcp_server",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "env": { "MCP_HOST": "127.0.0.1", "MCP_PORT": "8001", "AUTH_ISSUER_URL": "http://localhost:8000" },
+      "justMyCode": true
+    },
+    {
+      "name": "Web app (:5173)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/web"
+    },
+    {
+      "name": "Seed demo account",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/seed_demo.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "env": { "API_URL": "http://localhost:8000" }
+    },
+    {
+      "name": "Tests (pytest)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run app (API + MCP + Web)",
+      "configurations": ["API (FastAPI :8000)", "MCP server (:8001)", "Web app (:5173)"],
+      "stopAll": true
+    }
+  ]
+}

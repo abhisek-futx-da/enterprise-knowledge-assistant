@@ -9,10 +9,9 @@ from typing import Literal
 
 import numpy as np
 from rank_bm25 import BM25Okapi
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.cache import corpus_version
 from app.config import get_settings
 from app.db import is_postgres
 from app.ingestion.embeddings import embed_query
@@ -78,7 +77,11 @@ def vector_search(db: Session, user_id: str, query: str, k: int) -> list[SearchH
 
 
 class _BM25Cache:
-    """One BM25 index per (user, corpus version), LRU-bounded. Rebuilt only after that user's corpus changes."""
+    """One BM25 index per user, LRU-bounded, rebuilt only when that user's corpus changes.
+
+    Change is read from the database (passage count + newest document), not the shared cache, because the API and
+    MCP server are separate processes and without Redis neither sees the other's corpus-version bump.
+    """
 
     def __init__(self, max_users: int = 256) -> None:
         self._items: OrderedDict[str, tuple[str, BM25Okapi | None, list]] = OrderedDict()
@@ -86,7 +89,11 @@ class _BM25Cache:
         self._lock = threading.Lock()
 
     def get(self, db: Session, user_id: str) -> tuple[BM25Okapi | None, list]:
-        version = corpus_version(user_id)
+        version = str(db.execute(
+            select(func.count(Chunk.id), func.max(Document.created_at))
+            .join(Document, Document.id == Chunk.document_id)
+            .where(Chunk.owner_id == user_id, Document.status == "ready")
+        ).one())
         with self._lock:
             item = self._items.get(user_id)
             if item and item[0] == version:

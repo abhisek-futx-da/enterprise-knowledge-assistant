@@ -49,3 +49,14 @@ def test_vector_mode_scores_are_cosine(client):
     hits = client.post("/search", headers=user["headers"], json={"query": "hotel per night", "mode": "vector"}).json()
     assert all(-1.0 <= h["vector_score"] <= 1.0 for h in hits)
     assert hits == sorted(hits, key=lambda h: h["vector_score"], reverse=True)
+
+
+def test_bm25_index_notices_new_documents_without_the_shared_cache(client, monkeypatch):
+    """Without Redis, the API and MCP processes don't share corpus versions; the index must still refresh."""
+    user = register(client)
+    upload(client, user, "employee_handbook.md")
+    assert client.post("/search", headers=user["headers"], json={"query": "E-417", "mode": "bm25"}).json() == []
+    monkeypatch.setattr("app.ingestion.pipeline.bump_corpus_version", lambda user_id: None)  # signal lost
+    upload(client, user, "product_faq.txt")
+    hits = client.post("/search", headers=user["headers"], json={"query": "E-417", "mode": "bm25"}).json()
+    assert hits and hits[0]["filename"] == "product_faq.txt"

@@ -25,7 +25,7 @@ def main() -> None:
             continue
         c.post("/documents", headers=headers, files={"file": (path.name, path.read_bytes(), "text/plain")}).raise_for_status()
         print(f"upload {path.name}")
-    print(f"\nLog in at http://localhost:3000 with {EMAIL} / {PASSWORD}")
+    print(f"\nLog in with {EMAIL} / {PASSWORD} at http://localhost:3000 (Docker) or http://localhost:5173 (VS Code / npm)")
 
 
 if __name__ == "__main__":

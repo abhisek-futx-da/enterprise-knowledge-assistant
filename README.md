@@ -119,6 +119,25 @@ python scripts/smoke_test.py          # no LLM calls
 python scripts/smoke_test.py --chat   # also asks the agent three questions
 ```
 
+## Run in VS Code (no Docker)
+
+The repo ships a ready launch setup in `.vscode/`. No Docker is needed: it uses SQLite in place of Postgres and an
+in-process cache in place of Redis.
+
+1. Open the folder in VS Code and install the recommended extensions when asked (Python, Python Debugger).
+2. One-time setup in VS Code's terminal (Terminal → New Terminal):
+   ```bash
+   python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+   cd web && npm install && cd ..
+   cp .env.example .env      # then set JWT_SECRET and GROQ_API_KEY in .env
+   ```
+3. Open **Run and Debug** (⇧⌘D), pick **Run app (API + MCP + Web)** and press ▶. That starts the API on :8000,
+   the MCP server on :8001 and the web app on :5173. The red ■ stops all three.
+4. First time only: run **Seed demo account** from the same menu, then open **http://localhost:5173**.
+
+If the Docker stack is running, stop it first (`docker compose stop`), because it uses the same ports.
+Breakpoints work in the API and MCP server, since they run under the debugger.
+
 ## Local development (no Docker)
 
 ```bash
