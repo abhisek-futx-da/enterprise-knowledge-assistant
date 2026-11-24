@@ -184,8 +184,8 @@ body {
 }
 
 mark {
-  background: color-mix(in oklab, var(--accent) 70%, transparent);
-  color: inherit;
+  background: color-mix(in oklab, var(--accent) 85%, transparent);
+  color: var(--on-accent); /* inherited light text on lime was unreadable in dark mode */
   border-radius: 0.2rem;
   padding: 0 0.1rem;
 }
